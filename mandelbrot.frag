@@ -38,6 +38,10 @@
 uniform float time;
 uniform vec2 resolution;
 uniform vec4 iMouse;
+uniform uint draw_julia;
+uniform uint draw_derivative;
+uniform float line_width;
+uniform float fade_width;
 
 vec4 rainbow(vec2 vec) {
     float theta = atan(vec.x, vec.y);
@@ -57,7 +61,7 @@ vec4 img(vec2 uv, vec2 dz, float zoom) {
     col += vec4(xy, 1.8 - length(xy), 0.0);
 
     // clean up boundary
-    col = smoothstep(CUTOFF_RADIUS + LINE_THICKNESS, CUTOFF_RADIUS, length(uv)) * col;
+    col = smoothstep(CUTOFF_RADIUS + fade_width, CUTOFF_RADIUS, length(uv)) * col;
     
     // add gridlines (scaled by derivative)
     // mdz is 2d derivative of point z with respect to number of iterations
@@ -71,8 +75,8 @@ vec4 img(vec2 uv, vec2 dz, float zoom) {
 
     // computes a triangle wave of frequency 1/Q, uses smoothstep to only darken where function < LINE_THICKNESS
     float period = 1.0 / Q;
-    float x = smoothstep(LINE_THICKNESS / 2.0 * mdz, LINE_THICKNESS * mdz, abs(mod(uv.x, period) - period * 0.5));
-    float y = smoothstep(LINE_THICKNESS / 2.0 * mdz, LINE_THICKNESS * mdz, abs(mod(uv.y, period) - period * 0.5));
+    float x = smoothstep(line_width * mdz, (line_width + fade_width) * mdz, Q * abs(mod(uv.x, period) - period * 0.5));
+    float y = smoothstep(line_width * mdz, (line_width + fade_width) * mdz, Q * abs(mod(uv.y, period) - period * 0.5));
     
     // if (USE_TEXTURE) {
     //     col = texture(iChannel1, xy);
@@ -87,7 +91,7 @@ vec4 img(vec2 uv, vec2 dz, float zoom) {
 
 // draw a circle at position p with radius r for fragment uv
 float sdf_circle(vec2 uv, vec2 p, float r) {
-    return smoothstep(LINE_THICKNESS, LINE_THICKNESS * 2.0, abs(length(uv - p) - r));
+    return smoothstep(fade_width, fade_width * 2.0, abs(length(uv - p) - r));
 }
 
 // debug overlay
@@ -126,7 +130,7 @@ void main()
     // maintain state from previous iteration for lerping
     vec2[4] c, z, prev;
     vec2 zz = vec2(0.0);
-    if (JULIA) {
+    if (draw_julia) {
         vec2 cc = vec2(0.28, -0.008);
         cc = vec2(-0.79, 0.15);
         c = vec2[4](cc, cc, cc, cc);
@@ -161,14 +165,14 @@ void main()
     vec2 z_lerped = mix(prev[0], z[0], mix_factor);
     vec2 dz_lerped = mix(dz_prev, dz, mix_factor);
 
-    if (iMouse.z > 0.0) {
+    if (draw_derivative) {
         if (SHOW_DERIV_MAGNITUDE) {
             gl_FragColor = vec4(length(dz_lerped) * 4000.0);
         } else {
             gl_FragColor = rainbow(dz_lerped); //vec4(dz_lerped * 4000.0, 0.0, 1.0);
         }
         //gl_FragColor = smoothstep(CUTOFF_RADIUS + LINE_THICKNESS, CUTOFF_RADIUS, length(z_lerped)) * gl_FragColor;
-        gl_FragColor = (1.0 - smoothstep(CUTOFF_RADIUS, CUTOFF_RADIUS + LINE_THICKNESS * 160.0, length(z_lerped))) * gl_FragColor;
+        gl_FragColor = (1.0 - smoothstep(CUTOFF_RADIUS, CUTOFF_RADIUS + fade_width * 160.0, length(z_lerped))) * gl_FragColor;
     } else {
         // sample the image
         int i = 0;
